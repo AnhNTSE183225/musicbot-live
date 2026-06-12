@@ -2,13 +2,21 @@ import discord
 from discord.ext import commands
 import asyncio
 from audio.capture import ProcessAudioCaptureService
+from audio.device_capture import DeviceAudioCaptureService
 from audio.source import ProcessAudioSource
+import os
 
 class VoiceCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Using hardcoded Firefox exact path as requested
-        self.capture_service = ProcessAudioCaptureService(process_identifier=r"C:\Program Files\Mozilla Firefox\firefox.exe")
+        capture_mode = os.getenv("CAPTURE_MODE", "process").lower()
+        
+        if capture_mode == "device":
+            target_device = os.getenv("TARGET_DEVICE", "default")
+            self.capture_service = DeviceAudioCaptureService(target_device=target_device)
+        else:
+            target_process = os.getenv("TARGET_PROCESS", r"C:\Program Files\Mozilla Firefox\firefox.exe")
+            self.capture_service = ProcessAudioCaptureService(process_identifier=target_process)
 
     @commands.command(name="join")
     async def join(self, ctx):
