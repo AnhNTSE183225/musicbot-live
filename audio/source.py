@@ -13,14 +13,15 @@ class ProcessAudioSource(discord.AudioSource):
         self.silence = b'\x00' * self.chunk_size
 
     def read(self) -> bytes:
-        # Pull everything from the queue into the buffer
-        try:
-            while True:
-                # Non-blocking read from queue (Concurrency)
-                data = self.queue.get_nowait()
+        # Try to fill the buffer until we have at least chunk_size bytes
+        while len(self.buffer) < self.chunk_size:
+            try:
+                # Block briefly to wait for data (prevents glitchy underflows)
+                data = self.queue.get(timeout=0.01)
                 self.buffer.extend(data)
-        except queue.Empty:
-            pass
+            except queue.Empty:
+                # If we really don't have enough data after waiting, break out
+                break
 
         # If we have enough data, dispense one chunk
         if len(self.buffer) >= self.chunk_size:
@@ -28,8 +29,7 @@ class ProcessAudioSource(discord.AudioSource):
             del self.buffer[:self.chunk_size]
             return chunk
             
-        # If we don't have enough data but we are continuously broadcasting,
-        # return silence to keep the connection alive without jitter.
+        # Only inject silence if the buffer is genuinely starved
         return self.silence
 
     def cleanup(self):
